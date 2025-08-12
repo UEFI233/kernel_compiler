@@ -67,6 +67,15 @@ jobs:
          cd $HOME/kernel
          sed -i '/-Wno-int-conversion/d' drivers/kernelsu/Makefile
 
+      - name: Fix KernelSU for 4.9
+        run: |
+          cd $HOME/kernel
+          # 1. 把 () 改成 (void)
+          sed -i -E 's/^(void|extern void) ([^(]+) $$;/\1 \2(void);/g' \
+              drivers/kernelsu/*.h drivers/kernelsu/*.c
+          # 2. 删除 MODULE_IMPORT_NS
+          sed -i '/MODULE_IMPORT_NS/d' drivers/kernelsu/ksu.c
+
       - name: Build kernel
         run: |
           cd $HOME/kernel
