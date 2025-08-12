@@ -52,6 +52,12 @@ jobs:
         run: |
           git clone --depth=1 $KERNEL_SOURCE_URL -b $KERNEL_SOURCE_BRANCH $HOME/kernel
 
+      - name: Pull KernelSU into kernel
+        run: |
+          	  cd $HOME/kernel
+          		# 官方脚本会自动放到 drivers/kernelsu
+          		curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+
       - name: Build kernel
         run: |
           cd $HOME/kernel
