@@ -53,13 +53,15 @@ jobs:
           git clone --depth=1 $KERNEL_SOURCE_URL -b $KERNEL_SOURCE_BRANCH $HOME/kernel
 
       # ===== 提前生成 .config 并顺带把 host 工具编出来 =====
-      - name: Pre-config & pre-build host tools
+      - name: 预编译修复（补充dtc解析器生成）
         run: |
-          cd $HOME/kernel
-          # 1. 先产生 .config 与 auto.conf
-          make O=out $DEFCONFIG
-          # 2. 再编译 scripts（此时不会再缺 .config）
-          make O=out -j$(nproc) scripts
+          # 修复Kconfig无效字符问题
+          find . -name "Kconfig" -exec sed -i 's/[^[:print:]\t\n]//g' {} +
+          # 手动生成dtc解析器代码（关键步骤）
+          if [ ! -f "scripts/dtc/dtc-parser.tab.c" ]; then
+            bison -o scripts/dtc/dtc-parser.tab.c -d scripts/dtc/dtc-parser.y
+            flex -o scripts/dtc/dtc-lexer.lex.c scripts/dtc/dtc-lexer.l
+          fi
 
       - name: Build kernel
         run: |
