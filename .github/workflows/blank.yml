@@ -90,25 +90,25 @@ jobs:
           cd $HOME/kernel
           mkdir -p out/include/linux/netfilter
           .cat > out/include/linux/netfilter/xt_mark.h <<'EOF'
-#ifndef _XT_MARK_H
-#define _XT_MARK_H
+          #ifndef _XT_MARK_H
+          #define _XT_MARK_H
 
-#include <linux/types.h>
+          #include <linux/types.h>
 
-struct xt_mark_tginfo1 {
-    __u32 mark, mask;
+          struct xt_mark_tginfo1 {
+              __u32 mark, mask;
           };
 
-struct xt_mark_mtinfo1 {
-    __u32 mark, mask;
-    __u8  invert;
+          struct xt_mark_mtinfo1 {
+            __u32 mark, mask;
+            __u8  invert;
           };
 
-#endif /* _XT_MARK_H */
-EOF
+          #endif /* _XT_MARK_H */
+          EOF
 
       - name: Fix KernelSU strict-prototypes for 4.9
-          run: |
+        run: |
             cd $HOME/kernel
             # 把 () 改成 (void)
             sed -i -E 's/^(void|extern void) ([^(]+) $$/\1 \2(void)/g' \
