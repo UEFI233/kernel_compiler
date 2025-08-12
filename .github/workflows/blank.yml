@@ -89,7 +89,7 @@ jobs:
         run: |
           cd $HOME/kernel
           mkdir -p out/include/linux/netfilter
-          .cat > out/include/linux/netfilter/xt_mark.h <<'EOF'
+          cat > out/include/linux/netfilter/xt_mark.h <<'EOF'
           #ifndef _XT_MARK_H
           #define _XT_MARK_H
 
