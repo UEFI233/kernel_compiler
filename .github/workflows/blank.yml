@@ -51,11 +51,15 @@ jobs:
       - name: Clone kernel source
         run: |
           git clone --depth=1 $KERNEL_SOURCE_URL -b $KERNEL_SOURCE_BRANCH $HOME/kernel
-                
-      - name: Pre-build host tools
+
+      # ===== 提前生成 .config 并顺带把 host 工具编出来 =====
+      - name: Pre-config & pre-build host tools
         run: |
           cd $HOME/kernel
-          make O=out scripts 
+          # 1. 先产生 .config 与 auto.conf
+          make O=out $DEFCONFIG
+          # 2. 再编译 scripts（此时不会再缺 .config）
+          make O=out -j$(nproc) scripts
 
       - name: Build kernel
         run: |
