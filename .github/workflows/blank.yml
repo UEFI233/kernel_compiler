@@ -51,6 +51,11 @@ jobs:
       - name: Clone kernel source
         run: |
           git clone --depth=1 $KERNEL_SOURCE_URL -b $KERNEL_SOURCE_BRANCH $HOME/kernel
+                
+      - name: Pre-build host tools
+        run: |
+          cd $HOME/kernel
+          make O=out scripts 
 
       - name: Build kernel
         run: |
