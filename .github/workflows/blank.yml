@@ -85,28 +85,6 @@ jobs:
             -e 's/ret=%zd/ret=%d/g' \
             drivers/devkit/lcdkit/lcdkit1.0/core/common/hisi/lcdkit_panel_adaptor_hs.c
 
-      - name: Create missing xt_mark.h for 4.9
-        run: |
-          cd $HOME/kernel
-          mkdir -p out/include/linux/netfilter
-          cat > out/include/linux/netfilter/xt_mark.h <<'EOF'
-          #ifndef _XT_MARK_H
-          #define _XT_MARK_H
-
-          #include <linux/types.h>
-
-          struct xt_mark_tginfo1 {
-              __u32 mark, mask;
-          };
-
-          struct xt_mark_mtinfo1 {
-            __u32 mark, mask;
-            __u8  invert;
-          };
-
-          #endif /* _XT_MARK_H */
-          EOF
-
       - name: Fix KernelSU strict-prototypes for 4.9
         run: |
             cd $HOME/kernel
@@ -149,6 +127,15 @@ jobs:
 
           #endif /* _XT_MARK_H */
           EOF
+
+          # 2. 把 net/netfilter/Makefile 中的 -Werror 去掉
+          sed -i '/-Werror/d' net/netfilter/Makefile
+      - name: Fix KernelSU strict-prototypes
+        run: |
+          cd $HOME/kernel
+          # 把所有 () 改为 (void)
+          sed -i -E 's/\b(void|extern void)\s+([_a-zA-Z][_a-zA-Z0-9]*) $$/\1 \2(void)/g' \
+              drivers/kernelsu/*.h drivers/kernelsu/*.c
       - name: Build kernel
         run: |
           cd $HOME/kernel
