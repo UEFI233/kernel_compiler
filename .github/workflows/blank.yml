@@ -24,16 +24,29 @@ jobs:
     permissions:
       contents: write            # 需要写权限才能上传 Release
     steps:
-      - name: Install host deps
+      - name: Install host deps & build Python2.7
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev python2 git
-          sudo ln -sf /usr/bin/python2.7 /usr/bin/python
-
-            - name: Clone toolchain
-              run: |
-                  git clone --depth=1 $TOOLCHAIN_URL -b $TOOLCHAIN_BRANCH $HOME/toolchain
-                  echo "$HOME/toolchain/bin" >> $GITHUB_PATH
+            sudo apt-get update
+            sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev \
+                            libffi-dev zlib1g-dev libsqlite3-dev libreadline-dev \
+                            libbz2-dev libgdbm-dev git wget              
+            # 下载并编译 Python 2.7.18                
+            cd /tmp
+            wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
+            tar xf Python-2.7.18.tgz
+            cd Python-2.7.18                  
+            ./configure --prefix=/usr/local --enable-unicode=ucs4
+            make -j$(nproc)
+            sudo make install
+            # 把 python2.7 链成默认 python2              
+            sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python2                
+            sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python
+            python --version
+          
+      - name: Clone toolchain
+        run: |
+            git clone --depth=1 $TOOLCHAIN_URL -b $TOOLCHAIN_BRANCH $HOME/toolchain
+            echo "$HOME/toolchain/bin" >> $GITHUB_PATH
 
       - name: Clone kernel source
         run: |
