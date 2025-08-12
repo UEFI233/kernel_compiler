@@ -114,6 +114,42 @@ jobs:
             sed -i -E 's/^(void|extern void) ([^(]+) $$/\1 \2(void)/g' \
               drivers/kernelsu/*.h drivers/kernelsu/*.c
 
+            - name: Patch KernelSU & xt_mark for 4.9
+              run: |
+                cd $HOME/kernel
+                # 1. KernelSU 原型修正
+                sed -i -E 's/^(void|extern void) ([^(]+) $$/\1 \2(void)/g' \
+                drivers/kernelsu/*.h drivers/kernelsu/*.c
+
+                # 2. 创建缺失的头文件
+                mkdir -p out/include/linux/netfilter
+                cat > out/include/linux/netfilter/xt_mark.h <<'EOF'
+                #ifndef _XT_MARK_H
+                #define _XT_MARK_H
+
+                #include <linux/types.h>
+
+                struct xt_mark_tginfo1 {
+                    __u32 mark, mask;
+                  };
+
+                struct xt_mark_tginfo2 {
+                    __u32 mark, mask;
+                };
+
+                struct xt_mark_mtinfo1 {
+                    __u32 mark, mask;
+                    __u8  invert;
+                    };
+
+                struct xt_mark_mtinfo2 {
+                    __u32 mark, mask;
+                    __u8  invert;
+                };
+
+                #endif /* _XT_MARK_H */
+                EOF
+
       - name: Build kernel
         run: |
           cd $HOME/kernel
