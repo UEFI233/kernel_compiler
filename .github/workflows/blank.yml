@@ -1,0 +1,78 @@
+name: Build & Release Honor8x 4.9 Kernel
+
+on:
+  workflow_dispatch:          # 手动触发
+  push:
+    branches: [ main ]
+
+env:
+  # ===== 仅需按自己仓库改动 =====
+  KERNEL_SOURCE_URL: https://github.com/UEFI233/android_device_huawei_honor8x.git
+  KERNEL_SOURCE_BRANCH: EMUI9.1-sukiultra
+  DEFCONFIG: merge_kirin710_defconfig
+  ARCH: arm64
+  CROSS_COMPILE: aarch64-linux-android-
+  TOOLCHAIN_URL: https://github.com/Adrilaw/aarch64-linux-android-4.9-toolchain.git
+  TOOLCHAIN_BRANCH: master
+  # ===== 打包脚本 & 参数 =====
+  PACK_SCRIPT: tools/pack_kernerimage_cmd.sh   # 源码里自带的打包脚本路径
+  RELEASE_TAG: latest-build                    # 发行版标签
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write            # 需要写权限才能上传 Release
+    steps:
+      - name: Install host deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev python2 git
+          sudo ln -sf /usr/bin/python2.7 /usr/bin/python
+
+            - name: Clone toolchain
+              run: |
+                  git clone --depth=1 $TOOLCHAIN_URL -b $TOOLCHAIN_BRANCH $HOME/toolchain
+                  echo "$HOME/toolchain/bin" >> $GITHUB_PATH
+
+      - name: Clone kernel source
+        run: |
+          git clone --depth=1 $KERNEL_SOURCE_URL -b $KERNEL_SOURCE_BRANCH $HOME/kernel
+
+      - name: Build kernel
+        run: |
+          cd $HOME/kernel
+          make O=out $DEFCONFIG
+          make -j$(nproc) O=out \
+            CROSS_COMPILE=$CROSS_COMPILE \
+            ARCH=$ARCH \
+            2>&1 | tee out/build.log
+
+      - name: Check build result
+        run: |
+          if [ -f $HOME/kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
+            echo "✅ Build OK"
+          else
+            echo "❌ Build FAILED"
+            grep -i "error:" $HOME/kernel/out/build.log || true
+            exit 1
+          fi
+
+      - name: Pack kernel.img
+        run: |
+          cd $HOME/kernel
+          cp out/arch/arm64/boot/Image.gz-dtb $(dirname $PACK_SCRIPT)/Image.gz
+          bash $PACK_SCRIPT                      # 生成 kernel.img
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "Honor8x 4.9 Kernel Build"
+          body: |
+            Auto-built on ${{ github.sha }}  
+            Toolchain: `aarch64-linux-android-4.9`
+          files: |
+            $HOME/kernel/kernel.img
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
