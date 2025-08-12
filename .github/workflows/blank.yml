@@ -54,9 +54,9 @@ jobs:
 
       - name: Pull KernelSU into kernel
         run: |
-          	  cd $HOME/kernel
-          		# 官方脚本会自动放到 drivers/kernelsu
-          		curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+          cd $HOME/kernel
+          # 官方脚本会自动放到 drivers/kernelsu
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
 
       - name: Build kernel
         run: |
