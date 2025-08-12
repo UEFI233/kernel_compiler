@@ -62,6 +62,10 @@ jobs:
             bison -o $HOME/kernel/scripts/dtc/dtc-parser.tab.c -d $HOME/kernel/scripts/dtc/dtc-parser.y
             flex -o $HOME/kernel/scripts/dtc/dtc-lexer.lex.c $HOME/kernel/scripts/dtc/dtc-lexer.l
           fi
+      - name: Patch KernelSU for GCC 4.9
+        run: |
+         cd $HOME/kernel
+         sed -i '/-Wno-int-conversion/d' drivers/kernelsu/Makefile
 
       - name: Build kernel
         run: |
