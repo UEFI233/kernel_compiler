@@ -66,16 +66,7 @@ jobs:
         run: |
          cd $HOME/kernel
          sed -i '/-Wno-int-conversion/d' drivers/kernelsu/Makefile
-
-      - name: Fix KernelSU for 4.9
-        run: |
-          cd $HOME/kernel
-          # 1. 把 () 改成 (void)
-          sed -i -E 's/^(void|extern void) ([^(]+) $$;/\1 \2(void);/g' \
-              drivers/kernelsu/*.h drivers/kernelsu/*.c
-          # 2. 删除 MODULE_IMPORT_NS
-          sed -i '/MODULE_IMPORT_NS/d' drivers/kernelsu/ksu.c
-
+          
       - name: Fix format specifiers in lcdkit
         run: |
           cd $HOME/kernel
@@ -85,57 +76,43 @@ jobs:
             -e 's/ret=%zd/ret=%d/g' \
             drivers/devkit/lcdkit/lcdkit1.0/core/common/hisi/lcdkit_panel_adaptor_hs.c
 
-      - name: Fix KernelSU strict-prototypes for 4.9
-        run: |
-            cd $HOME/kernel
-            # 把 () 改成 (void)
-            sed -i -E 's/^(void|extern void) ([^(]+) $$/\1 \2(void)/g' \
-              drivers/kernelsu/*.h drivers/kernelsu/*.c
-
-      - name: Patch KernelSU & xt_mark for 4.9
+      - name: Fix KernelSU & xt_connmark for 4.9
         run: |
           cd $HOME/kernel
           # 1. KernelSU 原型修正
-          sed -i -E 's/^(void|extern void) ([^(]+) $$/\1 \2(void)/g' \
+          sed -i -E 's/\b(void|extern void)\s+([_a-zA-Z][_a-zA-Z0-9]*) $$/\1 \2(void)/g' \
               drivers/kernelsu/*.h drivers/kernelsu/*.c
 
-          # 2. 创建缺失的头文件
+          # 2. 补上缺失的 xt_connmark.h
           mkdir -p out/include/linux/netfilter
-          cat > out/include/linux/netfilter/xt_mark.h <<'EOF'
-          #ifndef _XT_MARK_H
-          #define _XT_MARK_H
-
+          cat > out/include/linux/netfilter/xt_connmark.h <<'EOF'
+          #ifndef _XT_CONNMARK_H
+          #define _XT_CONNMARK_H
           #include <linux/types.h>
 
-          struct xt_mark_tginfo1 {
-              __u32 mark, mask;
+          struct xt_connmark_tginfo1 {
+              __u32 ctmark, ctmask;
           };
 
-          struct xt_mark_tginfo2 {
-              __u32 mark, mask;
+          struct xt_connmark_tginfo2 {
+              __u32 ctmark, ctmask;
           };
 
-          struct xt_mark_mtinfo1 {
+          struct xt_connmark_mtinfo1 {
               __u32 mark, mask;
-              __u8 invert;
+              __u8  invert;
           };
 
-          struct xt_mark_mtinfo2 {
+          struct xt_connmark_mtinfo2 {
               __u32 mark, mask;
-              __u8 invert;
+              __u8  invert;
           };
-
-          #endif /* _XT_MARK_H */
+          #endif /* _XT_CONNMARK_H */
           EOF
+
 
           # 2. 把 net/netfilter/Makefile 中的 -Werror 去掉
           sed -i '/-Werror/d' net/netfilter/Makefile
-      - name: Fix KernelSU strict-prototypes
-        run: |
-          cd $HOME/kernel
-          # 把所有 () 改为 (void)
-          sed -i -E 's/\b(void|extern void)\s+([_a-zA-Z][_a-zA-Z0-9]*) $$/\1 \2(void)/g' \
-              drivers/kernelsu/*.h drivers/kernelsu/*.c
       - name: Build kernel
         run: |
           cd $HOME/kernel
