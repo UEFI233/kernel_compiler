@@ -58,9 +58,9 @@ jobs:
           # 修复Kconfig无效字符问题
           find . -name "Kconfig" -exec sed -i 's/[^[:print:]\t\n]//g' {} +
           # 手动生成dtc解析器代码（关键步骤）
-          if [ ! -f "scripts/dtc/dtc-parser.tab.c" ]; then
-            bison -o scripts/dtc/dtc-parser.tab.c -d scripts/dtc/dtc-parser.y
-            flex -o scripts/dtc/dtc-lexer.lex.c scripts/dtc/dtc-lexer.l
+          if [ ! -f "$HOME/kernel/scripts/dtc/dtc-parser.tab.c" ]; then
+            bison -o $HOME/kernel/scripts/dtc/dtc-parser.tab.c -d $HOME/kernel/scripts/dtc/dtc-parser.y
+            flex -o $HOME/kernel/scripts/dtc/dtc-lexer.lex.c $HOME/kernel/scripts/dtc/dtc-lexer.l
           fi
 
       - name: Build kernel
