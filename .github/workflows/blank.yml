@@ -43,27 +43,13 @@ jobs:
             sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python
             python --version
 
-      - name: Install GNU Make 3.81
+      - name: Install pre-built Make 3.81
         run: |
-          sudo apt-get update
-          # 1. 装编译工具链（此时系统 make 3.82 仍在）
-          sudo apt-get install -y build-essential
-
-          # 2. 下载源码
-          wget -q https://ftp.gnu.org/gnu/make/make-3.81.tar.gz
-          tar -xzf make-3.81.tar.gz
-          cd make-3.81
-
-          # 3. 修复 alloca 错误
-          sed -i 's/^#if.*__GNU_LIBRARY__/#if 0/' glob/glob.c
-
-          # 4. 用系统 make 编译 3.81
-          ./configure --prefix=/usr/local/make-3.81
-          make -j$(nproc)
-          sudo make install
-
-          # 5. 替换系统 make
-          sudo ln -sf /usr/local/make-3.81/bin/make /usr/bin/make
+          # 1. 下载官方 3.81 deb
+          wget -q http://archive.ubuntu.com/ubuntu/pool/main/m/make-dfsg/make_3.81-8.2ubuntu3_amd64.deb
+          # 2. 安装
+          sudo dpkg -i make_3.81-8.2ubuntu3_amd64.deb
+          # 3. 验证
           make --version | head -1
           
       - name: Clone toolchain
