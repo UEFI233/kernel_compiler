@@ -42,6 +42,31 @@ jobs:
             sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python2                
             sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python
             python --version
+
+      - name: Install GNU Make 3.81
+        run: |
+          # 1. 卸载系统 make，避免冲突
+          sudo apt-get remove --purge make
+
+          # 2. 下载源码
+          wget -q https://ftp.gnu.org/gnu/make/make-3.81.tar.gz
+          tar -xzf make-3.81.tar.gz
+          cd make-3.81
+
+          # 3. 修复 alloca 相关编译错误
+          sed -i 's/^#if.*__GNU_LIBRARY__/#if 0/' glob/glob.c
+
+          # 4. 编译安装到 /usr/local/make-3.81
+          ./configure --prefix=/usr/local/make-3.81
+          make -j$(nproc)
+          sudo make install
+
+          # 5. 把 make 3.81 放到 PATH 最前面
+          echo "/usr/local/make-3.81/bin" >> $GITHUB_PATH
+          sudo ln -sf /usr/local/make-3.81/bin/make /usr/bin/make
+
+          # 6. 验证
+          make --version | head -1
           
       - name: Clone toolchain
         run: |
@@ -75,43 +100,6 @@ jobs:
             -e 's/hbm_level=%zd/hbm_level=%d/g' \
             -e 's/ret=%zd/ret=%d/g' \
             drivers/devkit/lcdkit/lcdkit1.0/core/common/hisi/lcdkit_panel_adaptor_hs.c
-
-      - name: Fix KernelSU & netfilter for 4.9
-        run: |
-          cd $HOME/kernel
-          # 1. 补齐缺失头文件
-          mkdir -p out/include/linux out/include/linux/netfilter
-          cat > out/include/linux/netfilter/xt_mark.h <<'EOF'
-          #ifndef _XT_MARK_H
-          #define _XT_MARK_H
-          #include <linux/types.h>
-          struct xt_mark_tginfo2 { __u32 mark, mask; };
-          struct xt_mark_mtinfo2 { __u32 mark, mask; __u8 invert; };
-          #endif
-          EOF
-          cat > out/include/linux/netfilter/xt_connmark.h <<'EOF'
-          #ifndef _XT_CONNMARK_H
-          #define _XT_CONNMARK_H
-          #include <linux/types.h>
-          struct xt_connmark_tginfo2 { __u32 ctmark, ctmask; };
-          struct xt_connmark_mtinfo2 { __u32 mark, mask; __u8 invert; };
-          #endif
-          EOF
-          cat > out/include/linux/compiler_types.h <<'EOF'
-          #ifndef _LINUX_COMPILER_TYPES_H
-          #define _LINUX_COMPILER_TYPES_H
-          #ifndef __KERNEL__
-          #define __KERNEL__
-          #endif
-          #endif
-          EOF
-
-          # 2. KernelSU 原型修正
-          sed -i -E 's/\b(void|extern void)\s+([_a-zA-Z][_a-zA-Z0-9]*) $$/\1 \2(void)/g' \
-              drivers/kernelsu/*.h drivers/kernelsu/*.c
-
-          # 3. 删除不存在的 MODULE_IMPORT_NS
-          sed -i '/MODULE_IMPORT_NS/d' drivers/kernelsu/ksu.c
 
       - name: Build kernel
         run: |
