@@ -24,14 +24,6 @@ jobs:
     permissions:
       contents: write            # 需要写权限才能上传 Release
     steps:
-
-      - name: Create hardlink to KernelSU/kernel
-        run: |
-          # 确保目标目录存在（若不存在则创建）
-          sudo mkdir -p /drivers/kernelsu
-          # 创建硬链接（将真实目录下的文件链接到目标位置）
-          # 若需要链接整个目录，可使用 cp -r 复制（硬链接不支持跨目录链接目录）
-          sudo ln -f /KernelSU/kernel/* /drivers/kernelsu/
       - name: Install host deps & build Python2.7
         run: |
             sudo apt-get update
@@ -68,6 +60,14 @@ jobs:
       - name: Clone kernel source
         run: |
           git clone --depth=1 $KERNEL_SOURCE_URL -b $KERNEL_SOURCE_BRANCH $HOME/kernel
+      
+      - name: Create hardlink to KernelSU/kernel
+        run: |
+          # 确保目标目录存在（若不存在则创建）
+          sudo mkdir -p /drivers/kernelsu
+          # 创建硬链接（将真实目录下的文件链接到目标位置）
+          # 若需要链接整个目录，可使用 cp -r 复制（硬链接不支持跨目录链接目录）
+          sudo ln -f /KernelSU/kernel/* /drivers/kernelsu/
 
       # ===== 提前生成 .config 并顺带把 host 工具编出来 =====
       - name: 预编译修复（补充dtc解析器生成）
