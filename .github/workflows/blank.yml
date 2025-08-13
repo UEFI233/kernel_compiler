@@ -63,6 +63,7 @@ jobs:
       
       - name: Create hardlink to KernelSU/kernel
         run: |
+          cd $HOME/kernel
           # 确保目标目录存在（若不存在则创建）
           sudo mkdir -p /drivers/kernelsu
           # 创建硬链接（将真实目录下的文件链接到目标位置）
