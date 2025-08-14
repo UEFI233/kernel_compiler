@@ -89,23 +89,6 @@ jobs:
             -e 's/hbm_level=%zd/hbm_level=%d/g' \
             -e 's/ret=%zd/ret=%d/g' \
             drivers/devkit/lcdkit/lcdkit1.0/core/common/hisi/lcdkit_panel_adaptor_hs.c
-      - name: 🔧 永久关闭栈保护
-        run: |
-          cd $HOME/kernel
-          make O=out $DEFCONFIG
-          cd $HOME/kernel/out
-          # 1) 彻底关闭配置
-          sed -i '/CONFIG_CC_STACKPROTECTOR/d;/CONFIG_HAVE_CC_STACKPROTECTOR/d' .config
-          cat >> .config <<EOF
-          # CONFIG_HAVE_CC_STACKPROTECTOR is not set
-          # CONFIG_CC_STACKPROTECTOR is not set
-          # CONFIG_CC_STACKPROTECTOR_STRONG is not set
-          EOF
-          cd $HOME/kernel
-          # 2) 全局搜索并注释掉所有 -fstack-protector*
-          find . -name Makefile -exec sed -i '/-fstack-protector/s/^/#/' {} +
-          # 3) 保险起见，再清理一次
-          make O=out olddefconfig
 
       - name: Build kernel
         run: |
