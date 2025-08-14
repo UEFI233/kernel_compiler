@@ -100,27 +100,34 @@ jobs:
             ARCH=$ARCH \
             2>&1 | tee out/build.log
 
-      - name: Check and prepare Image.gz-dtb
+      - name: Generate Image.gz-dtb
         run: |
+          set -e
           IMG_PATH="$HOME/kernel/out/arch/arm64/boot/Image.gz"
-          DTB_DIR="$HOME/kernel/out/arch/arm64/boot/dts/hisilicon"
+          DTB_DIR="$HOME/kernel/out/arch/arm64/boot/dts"
           DTB_MERGED_PATH="$HOME/kernel/out/arch/arm64/boot/Image.gz-dtb"
 
-          if [ ! -f "$IMG_PATH" ]; then
-            echo "❌ Kernel Image.gz not found"
-            exit 1
-          fi
+          # 1. 确保 Image.gz 存在
+          [[ -f "$IMG_PATH" ]] || { echo "❌ Image.gz 不存在"; exit 1; }
 
-          # 查找 dtb 文件
-          DTB_FILES=$(find "$DTB_DIR" -name "*.dtb" | head -n 1)
+          # 2. 找到所有 dtb（hisilicon 或通用路径）
+          DTB_LIST=()
+          while IFS= read -r -d '' f; do
+            DTB_LIST+=("$f")
+          done < <(find "$DTB_DIR" -type f -name '*.dtb' -print0)
 
-          if [ -n "$DTB_FILES" ]; then
-            echo "✅ Found dtb files, merging into Image.gz-dtb..."
-            cat "$IMG_PATH" "$DTB_DIR"/*.dtb > "$DTB_MERGED_PATH"
+          # 3. 合并
+          if [[ ${#DTB_LIST[@]} -gt 0 ]]; then
+            echo "✅ 发现 ${#DTB_LIST[@]} 个 dtb，正在合并..."
+            cat "$IMG_PATH" "${DTB_LIST[@]}" > "$DTB_MERGED_PATH"
           else
-            echo "⚠️ No dtb files found. Using Image.gz as fallback."
+            echo "⚠️ 未找到 dtb，直接使用 Image.gz"
             cp "$IMG_PATH" "$DTB_MERGED_PATH"
           fi
+
+          # 4. 校验
+          [[ -s "$DTB_MERGED_PATH" ]] || { echo "❌ 合并失败"; exit 1; }
+          echo "✅ Image.gz-dtb 已生成：$(stat -c%s "$DTB_MERGED_PATH") 字节"
 
       - name: Pack kernel.img
         run: |
