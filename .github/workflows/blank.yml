@@ -100,21 +100,33 @@ jobs:
             ARCH=$ARCH \
             2>&1 | tee out/build.log
 
-      - name: Check build result
+      - name: Check and prepare Image.gz-dtb
         run: |
-          if [ -f $HOME/kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
-            echo "✅ Build OK"
-          else
-            echo "❌ Build FAILED"
-            grep -i "error:" $HOME/kernel/out/build.log || true
+          IMG_PATH="$HOME/kernel/out/arch/arm64/boot/Image.gz"
+          DTB_DIR="$HOME/kernel/out/arch/arm64/boot/dts/hisilicon"
+          DTB_MERGED_PATH="$HOME/kernel/out/arch/arm64/boot/Image.gz-dtb"
+
+          if [ ! -f "$IMG_PATH" ]; then
+            echo "❌ Kernel Image.gz not found"
             exit 1
+          fi
+
+          # 查找 dtb 文件
+          DTB_FILES=$(find "$DTB_DIR" -name "*.dtb" | head -n 1)
+
+          if [ -n "$DTB_FILES" ]; then
+            echo "✅ Found dtb files, merging into Image.gz-dtb..."
+            cat "$IMG_PATH" "$DTB_DIR"/*.dtb > "$DTB_MERGED_PATH"
+          else
+            echo "⚠️ No dtb files found. Using Image.gz as fallback."
+            cp "$IMG_PATH" "$DTB_MERGED_PATH"
           fi
 
       - name: Pack kernel.img
         run: |
           cd $HOME/kernel
           cp out/arch/arm64/boot/Image.gz-dtb $(dirname $PACK_SCRIPT)/Image.gz
-          bash $PACK_SCRIPT                      # 生成 kernel.img
+          bash $PACK_SCRIPT
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
