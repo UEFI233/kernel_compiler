@@ -110,9 +110,13 @@ jobs:
       - name: Build kernel
         run: |
           cd $HOME/kernel
+          # 强制去掉工具链注入的栈保护
+          export KBUILD_CFLAGS="-fno-stack-protector -fno-stack-protector-strong -fno-stack-protector-all"
+          make O=out $DEFconfig
           make -j$(nproc) O=out \
             CROSS_COMPILE=$CROSS_COMPILE \
             ARCH=$ARCH \
+            KBUILD_CFLAGS="$KBUILD_CFLAGS" \
             2>&1 | tee out/build.log
 
       - name: Check build result
