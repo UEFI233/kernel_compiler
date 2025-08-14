@@ -17,31 +17,36 @@ env:
   # ===== 打包脚本 & 参数 =====
   PACK_SCRIPT: tools/pack_kernerimage_cmd.sh   # 源码里自带的打包脚本路径
   RELEASE_TAG: latest-build                    # 发行版标签
-
+  PYTHON_CACHE_KEY: python2.7-ubuntu22-cache-v1   # 任意固定字符串即可
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write            # 需要写权限才能上传 Release
     steps:
+      - name: Cache Python 2.7 build
+        uses: actions/cache@v4
+        id: cache-py27
+        with:
+          path: /usr/local
+          key: ${{ env.PYTHON_CACHE_KEY }}      
+      
       - name: Install host deps & build Python2.7
+        if: steps.cache-py27.outputs.cache-hit != 'true'   # 关键：命中就跳过
         run: |
-            sudo apt-get update
-            sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev \
-                            libffi-dev zlib1g-dev libsqlite3-dev libreadline-dev \
-                            libbz2-dev libgdbm-dev git wget bison flex     
-            # 下载并编译 Python 2.7.18                
-            cd /tmp
-            wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
-            tar xf Python-2.7.18.tgz
-            cd Python-2.7.18                  
-            ./configure --prefix=/usr/local --enable-unicode=ucs4
-            make -j$(nproc)
-            sudo make install
-            # 把 python2.7 链成默认 python2              
-            sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python2                
-            sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python
-            python --version
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev \
+                          libffi-dev zlib1g-dev libsqlite3-dev libreadline-dev \
+                          libbz2-dev libgdbm-dev git wget bison flex
+          cd /tmp
+          wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
+          tar xf Python-2.7.18.tgz
+          cd Python-2.7.18
+          ./configure --prefix=/usr/local --enable-unicode=ucs4
+          make -j$(nproc)
+          sudo make install
+          sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python2
+          sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python
 
       - name: Install pre-built Make 3.81
         run: |
