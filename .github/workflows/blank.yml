@@ -144,8 +144,10 @@ jobs:
       - name: Pack kernel.img
         run: |
           cd $HOME/kernel
-          cp out/arch/arm64/boot/Image.gz-dtb $(dirname $PACK_SCRIPT)/Image.gz
-          bash $PACK_SCRIPT
+          chmod +x "$PACK_SCRIPT"
+          bash "$PACK_SCRIPT"
+          [[ -s kernel.img ]] || { echo "❌ kernel.img 未生成"; exit 1; }
+          echo "✅ kernel.img 已生成 $(stat -c%s kernel.img) 字节"
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
@@ -155,7 +157,6 @@ jobs:
           body: |
             Auto-built on ${{ github.sha }}  
             Toolchain: `aarch64-linux-android-4.9`
-          files: |
-            $HOME/kernel/kernel.img
+          files: /home/runner/kernel/kernel.img
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
