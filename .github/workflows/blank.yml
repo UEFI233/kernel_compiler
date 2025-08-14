@@ -129,6 +129,18 @@ jobs:
           [[ -s "$DTB_MERGED_PATH" ]] || { echo "❌ 合并失败"; exit 1; }
           echo "✅ Image.gz-dtb 已生成：$(stat -c%s "$DTB_MERGED_PATH") 字节"
 
+      - name: Export Image.gz on success or failure
+        if: always()
+        run: |
+          IMG_SRC="$HOME/kernel/out/arch/arm64/boot/Image.gz"
+          IMG_DST="$GITHUB_WORKSPACE/Image.gz"
+          if [[ -f "$IMG_SRC" ]]; then
+            cp "$IMG_SRC" "$IMG_DST"
+            echo "✅ Image.gz 已复制到仓库根目录：$IMG_DST"
+          else
+            echo "⚠️ 未找到 Image.gz，跳过复制"
+          fi
+
       - name: Pack kernel.img
         run: |
           cd $HOME/kernel
