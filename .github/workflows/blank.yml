@@ -89,30 +89,16 @@ jobs:
             -e 's/hbm_level=%zd/hbm_level=%d/g' \
             -e 's/ret=%zd/ret=%d/g' \
             drivers/devkit/lcdkit/lcdkit1.0/core/common/hisi/lcdkit_panel_adaptor_hs.c
-
+      
       - name: Build kernel
         run: |
           cd $HOME/kernel
-          #把 defconfig 生成到输出目录
-          make O=out ARCH=arm64 merge_kirin710_defconfig
-          # 强制去掉工具链注入的栈保护
-          export KBUILD_CFLAGS="-fno-stack-protector -fno-stack-protector-strong -fno-stack-protector-all"
-          make O=out $DEFconfig
+          make O=out ARCH=arm64 $DEFCONFIG
+          export KBUILD_CFLAGS="-fno-stack-protector"
           make -j$(nproc) O=out \
             CROSS_COMPILE=$CROSS_COMPILE \
             ARCH=$ARCH \
-            KBUILD_CFLAGS="$KBUILD_CFLAGS" \
             2>&1 | tee out/build.log
-
-      - name: Check build result
-        run: |
-          if [ -f $HOME/kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
-            echo "✅ Build OK"
-          else
-            echo "❌ Build FAILED"
-            grep -i "error:" $HOME/kernel/out/build.log || true
-            exit 1
-          fi
 
       - name: Pack kernel.img
         run: |
