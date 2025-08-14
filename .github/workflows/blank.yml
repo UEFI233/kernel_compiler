@@ -100,6 +100,16 @@ jobs:
             ARCH=$ARCH \
             2>&1 | tee out/build.log
 
+      - name: Check build result
+        run: |
+          if [ -f $HOME/kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
+            echo "✅ Build OK"
+          else
+            echo "❌ Build FAILED"
+            grep -i "error:" $HOME/kernel/out/build.log || true
+            exit 1
+          fi
+
       - name: Pack kernel.img
         run: |
           cd $HOME/kernel
