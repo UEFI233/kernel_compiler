@@ -143,11 +143,15 @@ jobs:
 
       - name: Pack kernel.img
         run: |
+          set -e
           cd $HOME/kernel
+          # 把正确文件放到脚本期望的位置
+          cp out/arch/arm64/boot/Image.gz-dtb tools/Image.gz
           chmod +x "$PACK_SCRIPT"
           bash "$PACK_SCRIPT"
           [[ -s kernel.img ]] || { echo "❌ kernel.img 未生成"; exit 1; }
           echo "✅ kernel.img 已生成 $(stat -c%s kernel.img) 字节"
+
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
