@@ -93,6 +93,7 @@ jobs:
         run: |
           cd $HOME/kernel
           make O=out $DEFCONFIG
+          cd $HOME/kernel/out
           # 1) 彻底关闭配置
           sed -i '/CONFIG_CC_STACKPROTECTOR/d;/CONFIG_HAVE_CC_STACKPROTECTOR/d' .config
           cat >> .config <<EOF
@@ -100,6 +101,7 @@ jobs:
           # CONFIG_CC_STACKPROTECTOR is not set
           # CONFIG_CC_STACKPROTECTOR_STRONG is not set
           EOF
+          cd $HOME/kernel
           # 2) 全局搜索并注释掉所有 -fstack-protector*
           find . -name Makefile -exec sed -i '/-fstack-protector/s/^/#/' {} +
           # 3) 保险起见，再清理一次
