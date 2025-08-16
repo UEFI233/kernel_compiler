@@ -1,11 +1,12 @@
 name: Build & Release Honor8x 4.9 Kernel
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:          # 手动触发
   push:
     branches: [ main ]
 
 env:
+  # ===== 仅需按自己仓库改动 =====
   KERNEL_SOURCE_URL: https://github.com/UEFI233/android_device_huawei_honor8x.git
   KERNEL_SOURCE_BRANCH: EMUI9.1-sukiultra
   DEFCONFIG: merge_kirin710_defconfig
@@ -13,114 +14,150 @@ env:
   CROSS_COMPILE: aarch64-linux-android-
   TOOLCHAIN_URL: https://github.com/Adrilaw/aarch64-linux-android-4.9-toolchain.git
   TOOLCHAIN_BRANCH: master
-  PACK_SCRIPT: tools/pack_kernerimage_cmd.sh
-
+  # ===== 打包脚本 & 参数 =====
+  PACK_SCRIPT: tools/pack_kernerimage_cmd.sh   # 源码里自带的打包脚本路径
+  RELEASE_TAG: latest-build                    # 发行版标签
+  PYTHON_CACHE_KEY: python2.7-ubuntu22-cache-v1   # 任意固定字符串即可
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write            # 需要写权限才能上传 Release
     steps:
-      # ---------- 1. 缓存 ----------
-      - name: Cache toolchain + Python + Make
+      - name: Cache Python 2.7 build
         uses: actions/cache@v4
-        id: big-cache
+        id: cache-py27
         with:
-          path: |
-            /usr/local
-            $HOME/toolchain
-          key: honor8x-kernel-${{ runner.os }}-gcc4.9-py27-make381-${{ hashFiles('**/README.md') }}
-
-      # ---------- 2. 一次性安装 ----------
-      - name: Install once
-        if: steps.big-cache.outputs.cache-hit != 'true'
+          path: /usr/local
+          key: ${{ env.PYTHON_CACHE_KEY }}      
+      
+      - name: Install host deps & build Python2.7
+        if: steps.cache-py27.outputs.cache-hit != 'true'   # 关键：命中就跳过
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y build-essential bc bison flex libssl-dev \
-            libncurses5-dev libffi-dev zlib1g-dev libsqlite3-dev \
-            libreadline-dev libbz2-dev libgdbm-dev git wget
-
-          # Python 2.7.18
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev \
+                          libffi-dev zlib1g-dev libsqlite3-dev libreadline-dev \
+                          libbz2-dev libgdbm-dev git wget bison flex
           cd /tmp
-          wget -q https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
+          wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
           tar xf Python-2.7.18.tgz
           cd Python-2.7.18
-          ./configure --prefix=/usr/local --enable-unicode=ucs4 > /dev/null
-          make -s -j$(nproc) && sudo make install -s
+          ./configure --prefix=/usr/local --enable-unicode=ucs4
+          make -j$(nproc)
+          sudo make install
+          sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python2
           sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python
 
-          # Make 3.81
-          wget -q http://archive.ubuntu.com/ubuntu/pool/main/m/make-dfsg/make_3.81-8.2ubuntu3_amd64.deb
-          sudo dpkg -i make_3.81-8.2ubuntu3_amd64.deb
-
-          # Toolchain
-          git clone --depth=1 $TOOLCHAIN_URL -b $TOOLCHAIN_BRANCH $HOME/toolchain
-          echo "$HOME/toolchain/bin" >> $GITHUB_PATH
-
-      # ---------- 3. 并行克隆 & 补丁 ----------
-      - name: Clone & patch
+      - name: Install pre-built Make 3.81
         run: |
-          git clone --depth=1 --filter=blob:none $KERNEL_SOURCE_URL \
-                    -b $KERNEL_SOURCE_BRANCH $HOME/kernel
-          cd $HOME/kernel
-          # 修复 Kconfig 非法字符
-          find . -name Kconfig -exec sed -i 's/[^[:print:]\t\n]//g' {} +
-          # 禁用 lib/stackprot.c 避免重复符号
-          sed -i '1i #if 0' lib/stackprot.c
-          echo '#endif' >> lib/stackprot.c
-          # lcdkit %zd → %d
-          sed -i -e 's/%zd/%d/g' \
-            drivers/devkit/lcdkit/lcdkit1.0/core/common/hisi/lcdkit_panel_adaptor_hs.c
-          # KernelSU GCC4.9 兼容
-          sed -i '/-Wno-int-conversion/d' drivers/kernelsu/Makefile
+          # 1. 下载官方 3.81 deb
+          wget -q http://archive.ubuntu.com/ubuntu/pool/main/m/make-dfsg/make_3.81-8.2ubuntu3_amd64.deb
+          # 2. 安装
+          sudo dpkg -i make_3.81-8.2ubuntu3_amd64.deb
+          # 3. 验证
+          make --version | head -1
+          
+      - name: Clone toolchain
+        run: |
+            git clone --depth=1 $TOOLCHAIN_URL -b $TOOLCHAIN_BRANCH $HOME/toolchain
+            echo "$HOME/toolchain/bin" >> $GITHUB_PATH
 
-      # ---------- 4. 增量编译 ----------
+      - name: Clone kernel source
+        run: |
+          git clone --depth=1 $KERNEL_SOURCE_URL -b $KERNEL_SOURCE_BRANCH $HOME/kernel
+
+      # ===== 提前生成 .config 并顺带把 host 工具编出来 =====
+      - name: 预编译修复（补充dtc解析器生成）
+        run: |
+          # 修复Kconfig无效字符问题
+          find . -name "Kconfig" -exec sed -i 's/[^[:print:]\t\n]//g' {} +
+          # 手动生成dtc解析器代码（关键步骤）
+          if [ ! -f "$HOME/kernel/scripts/dtc/dtc-parser.tab.c" ]; then
+            bison -o $HOME/kernel/scripts/dtc/dtc-parser.tab.c -d $HOME/kernel/scripts/dtc/dtc-parser.y
+            flex -o $HOME/kernel/scripts/dtc/dtc-lexer.lex.c $HOME/kernel/scripts/dtc/dtc-lexer.l
+          fi
+      - name: Patch KernelSU for GCC 4.9
+        run: |
+         cd $HOME/kernel
+         sed -i '/-Wno-int-conversion/d' drivers/kernelsu/Makefile
+          
+      - name: Fix format specifiers in lcdkit
+        run: |
+          cd $HOME/kernel
+          # 把 %zd 改成 %d（两处都在 lcdkit_panel_adaptor_hs.c）
+          sed -i \
+            -e 's/hbm_level=%zd/hbm_level=%d/g' \
+            -e 's/ret=%zd/ret=%d/g' \
+            drivers/devkit/lcdkit/lcdkit1.0/core/common/hisi/lcdkit_panel_adaptor_hs.c
+      
       - name: Build kernel
         run: |
           cd $HOME/kernel
           make O=out ARCH=arm64 $DEFCONFIG
+          export KBUILD_CFLAGS="-fno-stack-protector"
           make -j$(nproc) O=out \
             CROSS_COMPILE=$CROSS_COMPILE \
             ARCH=$ARCH \
-            KBUILD_CFLAGS="-fno-stack-protector -w" \
-            V=0
+            2>&1 | tee out/build.log
 
-      # ---------- 5. 生成 Image.gz-dtb ----------
       - name: Generate Image.gz-dtb
         run: |
           set -e
-          IMG="$HOME/kernel/out/arch/arm64/boot/Image.gz"
-          DTB="$HOME/kernel/out/arch/arm64/boot/dts"
-          OUT="$HOME/kernel/out/arch/arm64/boot/Image.gz-dtb"
-          [[ -f $IMG ]] || { echo "❌ Image.gz missing"; exit 1; }
-          DTBS=($(find "$DTB" -type f -name '*.dtb'))
-          if [[ ${#DTBS[@]} -gt 0 ]]; then
-            cat "$IMG" "${DTBS[@]}" > "$OUT"
-          else
-            cp "$IMG" "$OUT"
-          fi
-          ls -lh "$OUT"
+          IMG_PATH="$HOME/kernel/out/arch/arm64/boot/Image.gz"
+          DTB_DIR="$HOME/kernel/out/arch/arm64/boot/dts"
+          DTB_MERGED_PATH="$HOME/kernel/out/arch/arm64/boot/Image.gz-dtb"
 
-      # ---------- 6. 打包 kernel.img ----------
+          # 1. 确保 Image.gz 存在
+          [[ -f "$IMG_PATH" ]] || { echo "❌ Image.gz 不存在"; exit 1; }
+
+          # 2. 找到所有 dtb（hisilicon 或通用路径）
+          DTB_LIST=()
+          while IFS= read -r -d '' f; do
+            DTB_LIST+=("$f")
+          done < <(find "$DTB_DIR" -type f -name '*.dtb' -print0)
+
+          # 3. 合并
+          if [[ ${#DTB_LIST[@]} -gt 0 ]]; then
+            echo "✅ 发现 ${#DTB_LIST[@]} 个 dtb，正在合并..."
+            cat "$IMG_PATH" "${DTB_LIST[@]}" > "$DTB_MERGED_PATH"
+          else
+            echo "⚠️ 未找到 dtb，直接使用 Image.gz"
+            cp "$IMG_PATH" "$DTB_MERGED_PATH"
+          fi
+
+          # 4. 校验
+          [[ -s "$DTB_MERGED_PATH" ]] || { echo "❌ 合并失败"; exit 1; }
+          echo "✅ Image.gz-dtb 已生成：$(stat -c%s "$DTB_MERGED_PATH") 字节"
+
+      - name: Export Image.gz on success or failure
+        if: always()
+        run: |
+          IMG_SRC="$HOME/kernel/out/arch/arm64/boot/Image.gz"
+          IMG_DST="$GITHUB_WORKSPACE/Image.gz"
+          if [[ -f "$IMG_SRC" ]]; then
+            cp "$IMG_SRC" "$IMG_DST"
+            echo "✅ Image.gz 已复制到仓库根目录：$IMG_DST"
+          else
+            echo "⚠️ 未找到 Image.gz，跳过复制"
+          fi
+
       - name: Pack kernel.img
         run: |
+          set -e
           cd $HOME/kernel
+          # 把正确文件放到脚本期望的位置
           cp out/arch/arm64/boot/Image.gz-dtb tools/Image.gz
           chmod +x "$PACK_SCRIPT"
           bash "$PACK_SCRIPT"
-          [[ -s kernel.img ]] || { echo "❌ kernel.img empty"; exit 1; }
+          [[ -s kernel.img ]] || { echo "❌ kernel.img 未生成"; exit 1; }
+          echo "✅ kernel.img 已生成 $(stat -c%s kernel.img) 字节"
 
-      # ---------- 7. 生成日期标签 ----------
-      - name: Create date tag
-        id: date
-        run: echo "TAG=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
 
-      # ---------- 8. 上传 Release ----------
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.date.outputs.TAG }}
-          name: "Honor8x Kernel ${{ steps.date.outputs.TAG }}"
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "Honor8x 4.9 Kernel Build"
           body: |
             Auto-built on ${{ github.sha }}  
             Toolchain: `aarch64-linux-android-4.9`
